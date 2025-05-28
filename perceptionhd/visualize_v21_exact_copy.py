@@ -311,6 +311,15 @@ def generate_visualization_v21_exact(results, output_path):
         ("z-index: 1000;", "z-index: 10000;"),  # DML table
         ("z-index: 1002;", "z-index: 10002;"),  # Topic stats panel
         ("z-index: 1001;", "z-index: 10001;"),  # PC stats box if present
+        ("z-index: 100", "z-index: 100"),  # Keep essay display as is
+    ])
+    
+    # Add JavaScript to ensure panels come to front when toggled
+    replacements.extend([
+        ("table.style.display = checkbox.checked ? 'block' : 'none';", 
+         "table.style.display = checkbox.checked ? 'block' : 'none'; if(checkbox.checked) table.style.zIndex = '10000';"),
+        ("panel.style.display = checkbox.checked ? 'block' : 'none';", 
+         "panel.style.display = checkbox.checked ? 'block' : 'none'; if(checkbox.checked) panel.style.zIndex = '10002';"),
     ])
     
     # Apply replacements case-insensitively
