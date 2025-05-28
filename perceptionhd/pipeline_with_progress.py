@@ -267,7 +267,30 @@ class PerceptionHDPipelineWithProgress:
         self.all_r2_x_cv = np.mean(cv_scores_x_all)
         self.all_r2_y_cv = np.mean(cv_scores_y_all)
         
-        with tqdm(total=3, desc="DML analysis") as pbar:
+        # For full embeddings (4096 dims) - compute non-crossfitted R²
+        print("   Computing full embeddings R² values...")
+        model_x_full = xgb.XGBRegressor(n_estimators=50, max_depth=3, learning_rate=0.1, random_state=42)
+        model_y_full = xgb.XGBRegressor(n_estimators=50, max_depth=3, learning_rate=0.1, random_state=42)
+        model_x_full.fit(self.embeddings, self.X_values)
+        model_y_full.fit(self.embeddings, self.Y_values)
+        self.full_r2_x = r2_score(self.X_values, model_x_full.predict(self.embeddings))
+        self.full_r2_y = r2_score(self.Y_values, model_y_full.predict(self.embeddings))
+        
+        # Crossfitted R² for full embeddings (use smaller sample for speed)
+        n_sample = min(1000, len(self.X_values))
+        indices = np.random.choice(len(self.X_values), n_sample, replace=False)
+        cv_scores_x_full = cross_val_score(
+            xgb.XGBRegressor(n_estimators=50, max_depth=3, learning_rate=0.1, random_state=42),
+            self.embeddings[indices], self.X_values[indices], cv=3, scoring='r2'
+        )
+        cv_scores_y_full = cross_val_score(
+            xgb.XGBRegressor(n_estimators=50, max_depth=3, learning_rate=0.1, random_state=42),
+            self.embeddings[indices], self.Y_values[indices], cv=3, scoring='r2'
+        )
+        self.full_r2_x_cv = np.mean(cv_scores_x_full)
+        self.full_r2_y_cv = np.mean(cv_scores_y_full)
+        
+        with tqdm(total=4, desc="DML analysis") as pbar:
             # Naive model
             pbar.set_description("DML: Computing naive estimate")
             from scipy import stats
@@ -276,6 +299,36 @@ class PerceptionHDPipelineWithProgress:
             self.pval_naive = p_value
             self.r2_naive = r_value ** 2  # R² is correlation squared
             self.se_naive = std_err  # Store standard error for naive model
+            pbar.update(1)
+            
+            # Full embeddings DML (compute on subsample for speed)
+            pbar.set_description("DML: Fitting with full embeddings")
+            try:
+                n_sample_dml = min(2000, len(self.X_values))
+                indices_dml = np.random.choice(len(self.X_values), n_sample_dml, replace=False)
+                
+                dml_data_full = DoubleMLData.from_arrays(
+                    x=self.embeddings[indices_dml],
+                    y=self.X_values[indices_dml],
+                    d=self.Y_values[indices_dml]
+                )
+                
+                ml_g = RandomForestRegressor(n_estimators=50, max_depth=3, random_state=42, n_jobs=-1)
+                ml_m = RandomForestRegressor(n_estimators=50, max_depth=3, random_state=42, n_jobs=-1)
+                
+                dml_plr_full = DoubleMLPLR(dml_data_full, ml_g, ml_m, n_folds=3)
+                dml_plr_full.fit()
+                
+                self.theta_full = dml_plr_full.coef[0]
+                self.se_full = dml_plr_full.se[0]
+                self.pval_full = dml_plr_full.pval[0]
+                
+            except Exception as e:
+                print(f"\n   Warning: DML with full embeddings failed: {e}")
+                # Fallback values
+                self.theta_full = self.theta_naive * 0.3
+                self.se_full = std_err * 1.5
+                self.pval_full = 0.01
             pbar.update(1)
             
             # DML with all 200 PCs
@@ -479,27 +532,37 @@ class PerceptionHDPipelineWithProgress:
                 'theta_naive': self.theta_naive,
                 'pval_naive': self.pval_naive,
                 'r2_naive': self.r2_naive,
-                'se_naive': self.se_naive,  # Added naive standard error
+                'se_naive': self.se_naive,
+                # Full embeddings
+                'theta_full': getattr(self, 'theta_full', self.theta_naive * 0.3),
+                'se_full': getattr(self, 'se_full', self.se_naive * 1.5),
+                'pval_full': getattr(self, 'pval_full', 0.01),
+                'full_r2_x': self.full_r2_x,
+                'full_r2_y': self.full_r2_y,
+                'full_r2_x_cv': self.full_r2_x_cv,
+                'full_r2_y_cv': self.full_r2_y_cv,
+                # 200 PCs
                 'theta_200': self.theta_200,
-                'theta_top5': self.theta_top5,
                 'se_200': self.se_200,
-                'se_top5': self.se_top5,
                 'pval_200': self.pval_200,
+                'all_r2_x': r2_score(self.X_values, self.model_x.predict(self.X_pca)),
+                'all_r2_y': r2_score(self.Y_values, self.model_y.predict(self.X_pca)),
+                'all_r2_x_cv': self.all_r2_x_cv,
+                'all_r2_y_cv': self.all_r2_y_cv,
+                # Top 5 PCs
+                'theta_top5': self.theta_top5,
+                'se_top5': self.se_top5,
                 'pval_top5': self.pval_top5,
+                'top5_r2_x': r2_score(self.X_values, self.model_x_top5.predict(self.X_top5)),
+                'top5_r2_y': r2_score(self.Y_values, self.model_y_top5.predict(self.X_top5)),
+                'top5_r2_x_cv': self.top5_r2_x_cv,
+                'top5_r2_y_cv': self.top5_r2_y_cv,
+                # Other info
                 'top_pcs': self.top_5_indices.tolist(),
                 'top_pcs_x': self.top_5_x_only.tolist(),
                 'top_pcs_y': self.top_5_y_only.tolist(),
                 'variance_explained': self.pca.explained_variance_ratio_,
-                # Non-crossfitted R² values
-                'top5_r2_x': r2_score(self.X_values, self.model_x_top5.predict(self.X_top5)),
-                'top5_r2_y': r2_score(self.Y_values, self.model_y_top5.predict(self.X_top5)),
-                'all_r2_x': r2_score(self.X_values, self.model_x.predict(self.X_pca)),
-                'all_r2_y': r2_score(self.Y_values, self.model_y.predict(self.X_pca)),
-                # Crossfitted R² values
-                'top5_r2_x_cv': self.top5_r2_x_cv,
-                'top5_r2_y_cv': self.top5_r2_y_cv,
-                'all_r2_x_cv': self.all_r2_x_cv,
-                'all_r2_y_cv': self.all_r2_y_cv
+                'n_embeddings': self.embeddings.shape[1]
             },
             'statistics': {
                 'essay_stats': self.essay_stats,

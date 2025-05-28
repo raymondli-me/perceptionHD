@@ -329,6 +329,39 @@ def generate_visualization_v21_fully_generic(results, output_path):
         html_content
     )
     
+    # Update 95% CI for naive model
+    ci_lower = dml_results.get('theta_naive', 0) - 1.96 * dml_results.get('se_naive', 0.017)
+    ci_upper = dml_results.get('theta_naive', 0) + 1.96 * dml_results.get('se_naive', 0.017)
+    html_content = re.sub(
+        r'(95% CI:</td>\s*<td colspan="2" style="text-align: center;">)\([^)]+\)</td>',
+        f'\\g<1>({ci_lower:.3f}, {ci_upper:.3f})</td>',
+        html_content
+    )
+    
+    # Update effect reduction percentages
+    if 'theta_naive' in dml_results and dml_results['theta_naive'] != 0:
+        # For 200 PCs model
+        reduction_200 = (1 - abs(dml_results.get('theta_200', 0) / dml_results['theta_naive'])) * 100
+        html_content = re.sub(
+            r'(Effect Reduction vs Naive:</td>\s*<td style="color: #ff9800;">)[\d.]+%</td>\s*<td style="color: #ff9800;">[\d.]+%',
+            f'\\g<1>{reduction_200:.1f}%</td>\\n                <td style="color: #ff9800;">{reduction_200:.1f}%',
+            html_content
+        )
+        
+        # For Top 5 PCs model (find the second occurrence)
+        reduction_top5 = (1 - abs(dml_results.get('theta_top5', 0) / dml_results['theta_naive'])) * 100
+        # This is trickier - need to replace the second occurrence
+        parts = html_content.split('Effect Reduction vs Naive:</td>')
+        if len(parts) > 2:
+            # Find and replace in the third part (second occurrence)
+            parts[2] = re.sub(
+                r'(<td style="color: #ff9800;">)[\d.]+%</td>\s*<td style="color: #ff9800;">[\d.]+%',
+                f'\\g<1>{reduction_top5:.1f}%</td>\\n                <td style="color: #ff9800;">{reduction_top5:.1f}%',
+                parts[2],
+                count=1
+            )
+            html_content = 'Effect Reduction vs Naive:</td>'.join(parts)
+    
     # Update R² values with correct columns (non-crossfitted left, crossfitted right)
     # Y R² (Top 5) - Non-crossfitted in left column, crossfitted in right
     html_content = re.sub(
@@ -378,6 +411,27 @@ def generate_visualization_v21_fully_generic(results, output_path):
     html_content = re.sub(
         r'(θ \(X→Y\):</td>\s*<td colspan="2" style="text-align: center;">)[\d.-]+',
         f'\\g<1>{dml_results.get("theta_naive", 0):.3f}',
+        html_content
+    )
+    
+    # Update topic stats panel thresholds
+    # Get actual percentile values from data
+    y_p10 = essays_df['Y'].quantile(0.10)
+    y_p90 = essays_df['Y'].quantile(0.90)
+    x_p10 = int(essays_df['X'].quantile(0.10))
+    x_p90 = int(essays_df['X'].quantile(0.90))
+    
+    # Update Y thresholds
+    html_content = re.sub(
+        r'Y Variable thresholds: Top 10% ≥ [\d.]+, Bottom 10% ≤ [\d.]+',
+        f'Y Variable thresholds: Top 10% ≥ {y_p90:.2f}, Bottom 10% ≤ {y_p10:.2f}',
+        html_content
+    )
+    
+    # Update X thresholds
+    html_content = re.sub(
+        r'X Variable thresholds: Top = \d+, Bottom = \d+',
+        f'X Variable thresholds: Top 10% = {x_p90}, Bottom 10% = {x_p10}',
         html_content
     )
     
