@@ -320,6 +320,72 @@ def generate_visualization_v21_fully_generic(results, output_path):
     html_content = html_content.replace('PC0, PC2, PC5, PC13, PC46', pc_list)
     html_content = html_content.replace('PC8, PC17, PC2, PC5, PC4', pc_list)
     
+    # Check if we need to add the full embeddings model to the table
+    if 'theta_full' in dml_results:
+        # We have 4-model structure, need to insert full embeddings section
+        # Find where to insert (after naive model, before 200 PCs)
+        all_200_pcs_match = re.search(r'(<tr>\s*<td colspan="3"[^>]*>All 200 PCs Model</td>\s*</tr>)', html_content)
+        
+        if all_200_pcs_match:
+            # Build full embeddings section
+            n_embeddings = dml_results.get('n_embeddings', 4096)
+            theta_full = dml_results.get('theta_full', 0)
+            se_full = dml_results.get('se_full', 0.01)
+            pval_full = dml_results.get('pval_full', 0.01)
+            ci_full_lower = theta_full - 1.96 * se_full
+            ci_full_upper = theta_full + 1.96 * se_full
+            
+            reduction_full = 0
+            if 'theta_naive' in dml_results and dml_results['theta_naive'] != 0:
+                reduction_full = (1 - abs(theta_full / dml_results['theta_naive'])) * 100
+            
+            full_embeddings_html = f'''
+            <tr>
+                <td colspan="3" style="padding-top: 15px; font-weight: bold; color: #4CAF50;">Full Embeddings ({n_embeddings} dims)</td>
+            </tr>
+            <tr>
+                <td>DML θ ({X_short}→{Y_short}):</td>
+                <td>{theta_full:.3f}</td>
+                <td>{theta_full:.3f}</td>
+            </tr>
+            <tr>
+                <td>Standard Error:</td>
+                <td>{se_full:.3f}</td>
+                <td>{se_full:.3f}</td>
+            </tr>
+            <tr>
+                <td>95% CI:</td>
+                <td>({ci_full_lower:.3f}, {ci_full_upper:.3f})</td>
+                <td>({ci_full_lower:.3f}, {ci_full_upper:.3f})</td>
+            </tr>
+            <tr>
+                <td>p-value:</td>
+                <td>{pval_full:.4f}</td>
+                <td>{pval_full:.4f}</td>
+            </tr>
+            <tr>
+                <td style="color: #ff9800;">Effect Reduction vs Naive:</td>
+                <td style="color: #ff9800;">{reduction_full:.1f}%</td>
+                <td style="color: #ff9800;">{reduction_full:.1f}%</td>
+            </tr>
+            <tr>
+                <td>{Y_short} R² (Full):</td>
+                <td>{dml_results.get("full_r2_y", 0):.3f}</td>
+                <td>{dml_results.get("full_r2_y_cv", 0):.3f}</td>
+            </tr>
+            <tr>
+                <td>{X_short} R² (Full):</td>
+                <td>{dml_results.get("full_r2_x", 0):.3f}</td>
+                <td>{dml_results.get("full_r2_x_cv", 0):.3f}</td>
+            </tr>
+            '''
+            
+            # Insert before "All 200 PCs Model"
+            html_content = html_content.replace(
+                all_200_pcs_match.group(0),
+                full_embeddings_html + all_200_pcs_match.group(0)
+            )
+    
     # Update DML values with proper crossfitted/non-crossfitted distinction
     
     # Update Standard Error for naive model (it appears in a specific row)
