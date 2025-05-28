@@ -6,7 +6,7 @@ analysis:
   top_pcs_count: 5
   umap_dimensions: 3
 display:
-  title: X vs Y Analysis
+  title: "X vs Y Analysis"
 variables:
   X:
     max_value: 5

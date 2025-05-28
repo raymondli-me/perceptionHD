@@ -18,7 +18,6 @@ import xgboost as xgb
 from sklearn.cluster import HDBSCAN
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import r2_score
-from sklearn.model_selection import cross_val_predict
 from econml.dml import LinearDML
 from doubleml import DoubleMLPLR
 from doubleml import DoubleMLData
@@ -123,13 +122,27 @@ class PerceptionHDPipelineWithProgress:
         with tqdm(total=4, desc="XGBoost training") as pbar:
             # Train model for X
             pbar.set_description("Training XGBoost for X variable")
-            self.model_x = xgb.XGBRegressor(n_estimators=100, max_depth=5, random_state=42)
+            self.model_x = xgb.XGBRegressor(
+                n_estimators=100, 
+                max_depth=5,  # Back to original
+                learning_rate=0.1,
+                random_state=42
+            )
             self.model_x.fit(self.X_pca, self.X_values)
             pbar.update(1)
             
             # Train model for Y
             pbar.set_description("Training XGBoost for Y variable")
-            self.model_y = xgb.XGBRegressor(n_estimators=100, max_depth=5, random_state=42) 
+            self.model_y = xgb.XGBRegressor(
+                n_estimators=100, 
+                max_depth=3,  # Reduced from 5 to prevent overfitting
+                learning_rate=0.1,
+                random_state=42,
+                reg_alpha=0.5,    # L1 regularization
+                reg_lambda=1.0,   # L2 regularization
+                subsample=0.8,
+                colsample_bytree=0.8
+            ) 
             self.model_y.fit(self.X_pca, self.Y_values)
             pbar.update(1)
             
@@ -152,13 +165,79 @@ class PerceptionHDPipelineWithProgress:
         """Compute DML with detailed progress"""
         print("\n5. Computing Double Machine Learning...")
         
-        # Get top 5 PCs
-        total_contributions = np.abs(self.contributions_x) + np.abs(self.contributions_y)
-        avg_contributions = total_contributions.mean(axis=0)
-        self.top_5_indices = np.argsort(avg_contributions)[-5:][::-1]
+        # Use the original approach from v21 - averaged XGBoost feature importance
+        print("\n   Selecting top PCs using XGBoost feature importance...")
+        
+        # Train XGBoost models with original parameters
+        from sklearn.model_selection import cross_val_predict
+        
+        # Model for X prediction
+        model_x_full = xgb.XGBRegressor(
+            n_estimators=100,
+            max_depth=5,
+            learning_rate=0.1,
+            random_state=42
+        )
+        model_x_full.fit(self.X_pca, self.X_values)
+        importance_x = model_x_full.feature_importances_
+        
+        # Model for Y prediction  
+        model_y_full = xgb.XGBRegressor(
+            n_estimators=100,
+            max_depth=5,
+            learning_rate=0.1,
+            random_state=42
+        )
+        model_y_full.fit(self.X_pca, self.Y_values)
+        importance_y = model_y_full.feature_importances_
+        
+        # Combined importance (average)
+        combined_importance = (importance_x + importance_y) / 2
+        
+        # Get top 5 PCs by combined importance
+        self.top_5_indices = np.argsort(combined_importance)[-5:][::-1]
+        
+        # Also get separate top 5s for each
+        self.top_5_x_only = np.argsort(importance_x)[-5:][::-1]
+        self.top_5_y_only = np.argsort(importance_y)[-5:][::-1]
+        
+        # Debug output
+        print(f"\n   Feature importance stats:")
+        print(f"   X - max importance: {importance_x.max():.4f}, top 5 sum: {importance_x[self.top_5_x_only].sum():.4f}")
+        print(f"   Y - max importance: {importance_y.max():.4f}, top 5 sum: {importance_y[self.top_5_y_only].sum():.4f}")
+        print(f"   Combined - max: {combined_importance.max():.4f}, top 5 sum: {combined_importance[self.top_5_indices].sum():.4f}")
+        
+        # Note: X_top5 might have 5-10 columns now
         self.X_top5 = self.X_pca[:, self.top_5_indices]
         
-        print(f"   Top 5 PCs: {self.top_5_indices.tolist()}")
+        print(f"   Top 5 PCs for X: {self.top_5_x_only.tolist()}")
+        print(f"   Top 5 PCs for Y: {self.top_5_y_only.tolist()}")
+        print(f"   Combined unique PCs ({len(self.top_5_indices)} total): {self.top_5_indices.tolist()}")
+        
+        # Train separate XGBoost models for top 5 PCs to get accurate R² values
+        self.model_x_top5 = xgb.XGBRegressor(
+            n_estimators=100,
+            max_depth=3,
+            learning_rate=0.1,
+            random_state=42,
+            reg_alpha=0.5,
+            reg_lambda=1.0,
+            subsample=0.8,
+            colsample_bytree=0.8
+        )
+        self.model_x_top5.fit(self.X_top5, self.X_values)
+        
+        self.model_y_top5 = xgb.XGBRegressor(
+            n_estimators=100,
+            max_depth=3,
+            learning_rate=0.1,
+            random_state=42,
+            reg_alpha=0.5,
+            reg_lambda=1.0,
+            subsample=0.8,
+            colsample_bytree=0.8
+        )
+        self.model_y_top5.fit(self.X_top5, self.Y_values)
         
         with tqdm(total=3, desc="DML analysis") as pbar:
             # Naive model
@@ -378,15 +457,13 @@ class PerceptionHDPipelineWithProgress:
                 'pval_200': self.pval_200,
                 'pval_top5': self.pval_top5,
                 'top_pcs': self.top_5_indices.tolist(),
+                'top_pcs_x': self.top_5_x_only.tolist(),
+                'top_pcs_y': self.top_5_y_only.tolist(),
                 'variance_explained': self.pca.explained_variance_ratio_,
-                'top5_r2_x': r2_score(self.X_values, 
-                                     cross_val_predict(self.model_x, self.X_top5, self.X_values, cv=5)),
-                'top5_r2_y': r2_score(self.Y_values, 
-                                     cross_val_predict(self.model_y, self.X_top5, self.Y_values, cv=5)),
-                'all_r2_x': r2_score(self.X_values, 
-                                    cross_val_predict(self.model_x, self.X_pca, self.X_values, cv=5)),
-                'all_r2_y': r2_score(self.Y_values, 
-                                    cross_val_predict(self.model_y, self.X_pca, self.Y_values, cv=5))
+                'top5_r2_x': r2_score(self.X_values, self.model_x_top5.predict(self.X_top5)),
+                'top5_r2_y': r2_score(self.Y_values, self.model_y_top5.predict(self.X_top5)),
+                'all_r2_x': r2_score(self.X_values, self.model_x.predict(self.X_pca)),
+                'all_r2_y': r2_score(self.Y_values, self.model_y.predict(self.X_pca))
             },
             'statistics': {
                 'essay_stats': self.essay_stats,
@@ -419,9 +496,9 @@ class PerceptionHDPipelineWithProgress:
         
         # Generate visualization
         print("\n10. Generating visualization...")
-        from perceptionhd.visualize_v21_exact_copy import generate_visualization_v21_exact
+        from perceptionhd.visualize_v21_fully_generic import generate_visualization_v21_fully_generic
         html_path = self.output_dir / "perception_hd_visualization.html"
-        generate_visualization_v21_exact(self.results, html_path)
+        generate_visualization_v21_fully_generic(self.results, html_path)
         
         elapsed = time.time() - start_time
         print(f"\n{'='*60}")

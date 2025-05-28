@@ -323,9 +323,16 @@ def generate_visualization_v21_exact(results, output_path):
     # Add JavaScript to ensure panels come to front when toggled
     replacements.extend([
         ("table.style.display = checkbox.checked ? 'block' : 'none';", 
-         "table.style.display = checkbox.checked ? 'block' : 'none'; if(checkbox.checked) table.style.zIndex = '10000';"),
+         "table.style.display = checkbox.checked ? 'block' : 'none'; if(checkbox.checked) { table.style.zIndex = '99999'; setTimeout(() => table.style.zIndex = '99999', 100); }"),
         ("panel.style.display = checkbox.checked ? 'block' : 'none';", 
-         "panel.style.display = checkbox.checked ? 'block' : 'none'; if(checkbox.checked) panel.style.zIndex = '10002';"),
+         "panel.style.display = checkbox.checked ? 'block' : 'none'; if(checkbox.checked) { panel.style.zIndex = '99999'; setTimeout(() => panel.style.zIndex = '99999', 100); }"),
+    ])
+    
+    # Also increase the base z-index values even more
+    replacements.extend([
+        ("z-index: 10000;", "z-index: 99999;"),
+        ("z-index: 10002;", "z-index: 99999;"),
+        ("z-index: 10001;", "z-index: 99999;"),
     ])
     
     # Apply replacements case-insensitively
@@ -357,6 +364,28 @@ def generate_visualization_v21_exact(results, output_path):
     naive_r2_pattern = r'(R² \(variance explained\):</td>\s*<td colspan="2" style="text-align: center;">)[0-9.]+</td>'
     naive_r2_replacement = f"\\g<1>{dml_results.get('r2_naive', 0):.3f}</td>"
     html_content = re.sub(naive_r2_pattern, naive_r2_replacement, html_content)
+    
+    # Update the Top 5 PCs list with detailed info
+    if 'top_pcs' in dml_results:
+        # Create detailed PC list showing which are best for X vs Y
+        top_x = set(dml_results.get('top_pcs_x', []))
+        top_y = set(dml_results.get('top_pcs_y', []))
+        
+        pc_details = []
+        for pc in dml_results['top_pcs']:
+            label = f'PC{pc}'
+            if pc in top_x and pc in top_y:
+                label += f' ({X_short}+{Y_short})'
+            elif pc in top_x:
+                label += f' ({X_short})'
+            elif pc in top_y:
+                label += f' ({Y_short})'
+            pc_details.append(label)
+        
+        pc_list = ', '.join(pc_details)
+        pcs_pattern = r'(PCs Used \(Top 5\):</td>\s*<td colspan="2"[^>]*>)[^<]+</td>'
+        pcs_replacement = f"\\g<1>{pc_list}</td>"
+        html_content = re.sub(pcs_pattern, pcs_replacement, html_content)
     
     # Update p-values
     html_content = re.sub(r'<td>0\.\d+</td>(\s*<!--\s*pval_naive_sc_to_ai\s*-->)', 
