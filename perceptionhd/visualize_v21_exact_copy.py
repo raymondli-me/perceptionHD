@@ -300,9 +300,9 @@ def generate_visualization_v21_exact(results, output_path):
         ("Social Class thresholds:", f"{X_name} thresholds:"),
     ]
     
-    # Also update the essay display width (make it narrower by ~2 inches on each side)
+    # Also update the essay display width (make it narrower by ~2 inches on right, ~3 inches on left)
     replacements.extend([
-        ("left: 60px;", "left: 250px;"),
+        ("left: 60px;", "left: 350px;"),
         ("right: 60px;", "right: 250px;"),
     ])
     
