@@ -15,7 +15,7 @@ A Python package for analyzing high-dimensional perception data using UMAP visua
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/perceptionHD.git
+git clone https://github.com/raymondli-me/perceptionHD.git
 cd perceptionHD
 
 # Install dependencies
@@ -188,9 +188,9 @@ If you use PerceptionHD in your research, please cite:
 ```bibtex
 @software{perceptionhd2024,
   title={PerceptionHD: High-Dimensional Perception Analysis},
-  author={Your Name},
+  author={Raymond Li},
   year={2024},
-  url={https://github.com/YOUR_USERNAME/perceptionHD}
+  url={https://github.com/raymondli-me/perceptionHD}
 }
 ```
 
