@@ -342,6 +342,22 @@ def generate_visualization_v21_exact(results, output_path):
     html_content = re.sub(r'<td>-?\d+\.\d+</td>(\s*<!--\s*theta_top5_sc_to_ai\s*-->)', 
                          f"<td>{dml_results['theta_top5']:.3f}</td>\\1", html_content)
     
+    # Update R² values dynamically (they will have been replaced with Y/X labels already)
+    # Look for the pattern "Y R² (Top 5):" followed by two <td> cells
+    y_r2_pattern = rf'({Y_short} R² \(Top 5\):</td>\s*<td>)[0-9.-]+</td>\s*<td>[0-9.-]+</td>'
+    y_r2_replacement = f"\\g<1>{dml_results.get('top5_r2_y', 0):.3f}</td>\n                <td>{dml_results.get('top5_r2_y', 0):.3f}</td>"
+    html_content = re.sub(y_r2_pattern, y_r2_replacement, html_content)
+    
+    # Same for X R²
+    x_r2_pattern = rf'({X_short} R² \(Top 5\):</td>\s*<td>)[0-9.-]+</td>\s*<td>[0-9.-]+</td>'
+    x_r2_replacement = f"\\g<1>{dml_results.get('top5_r2_x', 0):.3f}</td>\n                <td>{dml_results.get('top5_r2_x', 0):.3f}</td>"
+    html_content = re.sub(x_r2_pattern, x_r2_replacement, html_content)
+    
+    # Update naive R² value
+    naive_r2_pattern = r'(R² \(variance explained\):</td>\s*<td colspan="2" style="text-align: center;">)[0-9.]+</td>'
+    naive_r2_replacement = f"\\g<1>{dml_results.get('r2_naive', 0):.3f}</td>"
+    html_content = re.sub(naive_r2_pattern, naive_r2_replacement, html_content)
+    
     # Update p-values
     html_content = re.sub(r'<td>0\.\d+</td>(\s*<!--\s*pval_naive_sc_to_ai\s*-->)', 
                          f"<td>{dml_results['pval_naive']:.4f}</td>\\1", html_content)

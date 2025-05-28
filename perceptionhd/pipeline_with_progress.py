@@ -167,6 +167,7 @@ class PerceptionHDPipelineWithProgress:
             slope, intercept, r_value, p_value, std_err = stats.linregress(self.Y_values, self.X_values)
             self.theta_naive = slope
             self.pval_naive = p_value
+            self.r2_naive = r_value ** 2  # R² is correlation squared
             pbar.update(1)
             
             # DML with all 200 PCs
@@ -369,6 +370,7 @@ class PerceptionHDPipelineWithProgress:
             'dml_results': {
                 'theta_naive': self.theta_naive,
                 'pval_naive': self.pval_naive,
+                'r2_naive': self.r2_naive,
                 'theta_200': self.theta_200,
                 'theta_top5': self.theta_top5,
                 'se_200': self.se_200,
