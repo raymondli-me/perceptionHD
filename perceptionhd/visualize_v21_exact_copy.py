@@ -295,6 +295,12 @@ def generate_visualization_v21_exact(results, output_path):
         ("Correlation with AI Rating:", f"Correlation with {Y_name}:"),
         ("Correlation with Social Class:", f"Correlation with {X_name}:"),
         
+        # R² labels in DML table
+        ("AI R² (Top 5):", f"{Y_short} R² (Top 5):"),
+        ("SC R² (Top 5):", f"{X_short} R² (Top 5):"),
+        ("AI R²", f"{Y_short} R²"),
+        ("SC R²", f"{X_short} R²"),
+        
         # Threshold info
         ("AI Rating thresholds:", f"{Y_name} thresholds:"),
         ("Social Class thresholds:", f"{X_name} thresholds:"),

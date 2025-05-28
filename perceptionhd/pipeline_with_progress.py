@@ -377,10 +377,14 @@ class PerceptionHDPipelineWithProgress:
                 'pval_top5': self.pval_top5,
                 'top_pcs': self.top_5_indices.tolist(),
                 'variance_explained': self.pca.explained_variance_ratio_,
-                'top5_r2': r2_score(self.X_values, 
-                                   cross_val_predict(self.model_x, self.X_top5, self.X_values, cv=5)),
-                'all_r2': r2_score(self.X_values, 
-                                  cross_val_predict(self.model_x, self.X_pca, self.X_values, cv=5))
+                'top5_r2_x': r2_score(self.X_values, 
+                                     cross_val_predict(self.model_x, self.X_top5, self.X_values, cv=5)),
+                'top5_r2_y': r2_score(self.Y_values, 
+                                     cross_val_predict(self.model_y, self.X_top5, self.Y_values, cv=5)),
+                'all_r2_x': r2_score(self.X_values, 
+                                    cross_val_predict(self.model_x, self.X_pca, self.X_values, cv=5)),
+                'all_r2_y': r2_score(self.Y_values, 
+                                    cross_val_predict(self.model_y, self.X_pca, self.Y_values, cv=5))
             },
             'statistics': {
                 'essay_stats': self.essay_stats,
