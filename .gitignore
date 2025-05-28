@@ -44,8 +44,10 @@ Thumbs.db
 docs/_build/
 
 # Output directories
+archive/
 progress_output/
 test_output/
 quick_demo_output/
 minimal_example_output/
 *.html
+*.log
