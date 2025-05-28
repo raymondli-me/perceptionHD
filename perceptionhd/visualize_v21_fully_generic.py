@@ -320,60 +320,64 @@ def generate_visualization_v21_fully_generic(results, output_path):
     html_content = html_content.replace('PC0, PC2, PC5, PC13, PC46', pc_list)
     html_content = html_content.replace('PC8, PC17, PC2, PC5, PC4', pc_list)
     
-    # Try a different approach - update DML values without relying on table ID
-    # Update theta values in the X->Y column
+    # Update DML values with proper crossfitted/non-crossfitted distinction
+    
+    # Update Standard Error for naive model (it appears in a specific row)
     html_content = re.sub(
-        r'<td>-?\d+\.\d+</td>(\s*<!--\s*theta_naive_sc_to_ai\s*-->)',
-        f'<td>{dml_results["theta_naive"]:.3f}</td>\\1',
-        html_content
-    )
-    html_content = re.sub(
-        r'<td>-?\d+\.\d+</td>(\s*<!--\s*theta_200_sc_to_ai\s*-->)',
-        f'<td>{dml_results["theta_200"]:.3f}</td>\\1',
-        html_content
-    )
-    html_content = re.sub(
-        r'<td>-?\d+\.\d+</td>(\s*<!--\s*theta_top5_sc_to_ai\s*-->)',
-        f'<td>{dml_results["theta_top5"]:.3f}</td>\\1',
+        r'(Standard Error:</td>\s*<td colspan="2" style="text-align: center;">)[\d.]+</td>',
+        f'\\g<1>{dml_results.get("se_naive", 0.017):.3f}</td>',
         html_content
     )
     
-    # Update p-values
-    html_content = re.sub(
-        r'<td>[\d.]+</td>(\s*<!--\s*pval_naive_sc_to_ai\s*-->)',
-        f'<td>{dml_results["pval_naive"]:.4f}</td>\\1',
-        html_content
-    )
-    html_content = re.sub(
-        r'<td>[\d.]+</td>(\s*<!--\s*pval_200_sc_to_ai\s*-->)',
-        f'<td>{dml_results["pval_200"]:.4f}</td>\\1',
-        html_content
-    )
-    html_content = re.sub(
-        r'<td>[\d.]+</td>(\s*<!--\s*pval_top5_sc_to_ai\s*-->)',
-        f'<td>{dml_results["pval_top5"]:.4f}</td>\\1',
-        html_content
-    )
-    
-    # Update R² values with generic labels
-    # Y R² (Top 5)
+    # Update R² values with correct columns (non-crossfitted left, crossfitted right)
+    # Y R² (Top 5) - Non-crossfitted in left column, crossfitted in right
     html_content = re.sub(
         rf'{Y_short} R² \(Top 5\):</td>\s*<td>[\d.-]+</td>\s*<td>[\d.-]+</td>',
-        f'{Y_short} R² (Top 5):</td>\\n                <td>{dml_results.get("top5_r2_y", 0):.3f}</td>\\n                <td>{dml_results.get("top5_r2_y", 0):.3f}</td>',
+        f'{Y_short} R² (Top 5):</td>\\n                <td>{dml_results.get("top5_r2_y", 0):.3f}</td>\\n                <td>{dml_results.get("top5_r2_y_cv", 0):.3f}</td>',
         html_content
     )
     
-    # X R² (Top 5)
+    # X R² (Top 5) - Non-crossfitted in left column, crossfitted in right
     html_content = re.sub(
         rf'{X_short} R² \(Top 5\):</td>\s*<td>[\d.-]+</td>\s*<td>[\d.-]+</td>',
-        f'{X_short} R² (Top 5):</td>\\n                <td>{dml_results.get("top5_r2_x", 0):.3f}</td>\\n                <td>{dml_results.get("top5_r2_x", 0):.3f}</td>',
+        f'{X_short} R² (Top 5):</td>\\n                <td>{dml_results.get("top5_r2_x", 0):.3f}</td>\\n                <td>{dml_results.get("top5_r2_x_cv", 0):.3f}</td>',
         html_content
     )
     
-    # Naive R²
+    # Y R² (200 PCs) - Non-crossfitted in left column, crossfitted in right
+    html_content = re.sub(
+        rf'{Y_short} R² \(200 PCs\):</td>\s*<td>[\d.-]+</td>\s*<td>[\d.-]+</td>',
+        f'{Y_short} R² (200 PCs):</td>\\n                <td>{dml_results.get("all_r2_y", 0):.3f}</td>\\n                <td>{dml_results.get("all_r2_y_cv", 0):.3f}</td>',
+        html_content
+    )
+    
+    # X R² (200 PCs) - Non-crossfitted in left column, crossfitted in right
+    html_content = re.sub(
+        rf'{X_short} R² \(200 PCs\):</td>\s*<td>[\d.-]+</td>\s*<td>[\d.-]+</td>',
+        f'{X_short} R² (200 PCs):</td>\\n                <td>{dml_results.get("all_r2_x", 0):.3f}</td>\\n                <td>{dml_results.get("all_r2_x_cv", 0):.3f}</td>',
+        html_content
+    )
+    
+    # Naive R² (spans both columns)
     html_content = re.sub(
         r'R² \(variance explained\):</td>\s*<td colspan="2" style="text-align: center;">[\d.]+</td>',
         f'R² (variance explained):</td>\\n                <td colspan="2" style="text-align: center;">{dml_results.get("r2_naive", 0):.3f}</td>',
+        html_content
+    )
+    
+    # Update theta values using more flexible patterns
+    # These might not have HTML comments, so we need to be more careful
+    # Update DML theta values for 200 PC model
+    html_content = re.sub(
+        r'(DML θ \(X→Y\):</td>\s*<td>)[\d.-]+</td>\s*<td>[\d.-]+',
+        f'\\g<1>{dml_results.get("theta_200", 0):.3f}</td>\\n                <td>{dml_results.get("theta_200", 0):.3f}',
+        html_content
+    )
+    
+    # Update theta for naive model
+    html_content = re.sub(
+        r'(θ \(X→Y\):</td>\s*<td colspan="2" style="text-align: center;">)[\d.-]+',
+        f'\\g<1>{dml_results.get("theta_naive", 0):.3f}',
         html_content
     )
     

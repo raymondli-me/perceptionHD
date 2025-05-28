@@ -239,6 +239,34 @@ class PerceptionHDPipelineWithProgress:
         )
         self.model_y_top5.fit(self.X_top5, self.Y_values)
         
+        # Compute crossfitted R² values using 5-fold cross-validation
+        print("   Computing crossfitted R² values...")
+        from sklearn.model_selection import cross_val_score
+        
+        # For top 5 PCs
+        cv_scores_x_top5 = cross_val_score(
+            xgb.XGBRegressor(n_estimators=100, max_depth=3, learning_rate=0.1, random_state=42),
+            self.X_top5, self.X_values, cv=5, scoring='r2'
+        )
+        cv_scores_y_top5 = cross_val_score(
+            xgb.XGBRegressor(n_estimators=100, max_depth=3, learning_rate=0.1, random_state=42),
+            self.X_top5, self.Y_values, cv=5, scoring='r2'
+        )
+        self.top5_r2_x_cv = np.mean(cv_scores_x_top5)
+        self.top5_r2_y_cv = np.mean(cv_scores_y_top5)
+        
+        # For all 200 PCs
+        cv_scores_x_all = cross_val_score(
+            xgb.XGBRegressor(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42),
+            self.X_pca, self.X_values, cv=5, scoring='r2'
+        )
+        cv_scores_y_all = cross_val_score(
+            xgb.XGBRegressor(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42),
+            self.X_pca, self.Y_values, cv=5, scoring='r2'
+        )
+        self.all_r2_x_cv = np.mean(cv_scores_x_all)
+        self.all_r2_y_cv = np.mean(cv_scores_y_all)
+        
         with tqdm(total=3, desc="DML analysis") as pbar:
             # Naive model
             pbar.set_description("DML: Computing naive estimate")
@@ -247,6 +275,7 @@ class PerceptionHDPipelineWithProgress:
             self.theta_naive = slope
             self.pval_naive = p_value
             self.r2_naive = r_value ** 2  # R² is correlation squared
+            self.se_naive = std_err  # Store standard error for naive model
             pbar.update(1)
             
             # DML with all 200 PCs
@@ -450,6 +479,7 @@ class PerceptionHDPipelineWithProgress:
                 'theta_naive': self.theta_naive,
                 'pval_naive': self.pval_naive,
                 'r2_naive': self.r2_naive,
+                'se_naive': self.se_naive,  # Added naive standard error
                 'theta_200': self.theta_200,
                 'theta_top5': self.theta_top5,
                 'se_200': self.se_200,
@@ -460,10 +490,16 @@ class PerceptionHDPipelineWithProgress:
                 'top_pcs_x': self.top_5_x_only.tolist(),
                 'top_pcs_y': self.top_5_y_only.tolist(),
                 'variance_explained': self.pca.explained_variance_ratio_,
+                # Non-crossfitted R² values
                 'top5_r2_x': r2_score(self.X_values, self.model_x_top5.predict(self.X_top5)),
                 'top5_r2_y': r2_score(self.Y_values, self.model_y_top5.predict(self.X_top5)),
                 'all_r2_x': r2_score(self.X_values, self.model_x.predict(self.X_pca)),
-                'all_r2_y': r2_score(self.Y_values, self.model_y.predict(self.X_pca))
+                'all_r2_y': r2_score(self.Y_values, self.model_y.predict(self.X_pca)),
+                # Crossfitted R² values
+                'top5_r2_x_cv': self.top5_r2_x_cv,
+                'top5_r2_y_cv': self.top5_r2_y_cv,
+                'all_r2_x_cv': self.all_r2_x_cv,
+                'all_r2_y_cv': self.all_r2_y_cv
             },
             'statistics': {
                 'essay_stats': self.essay_stats,
