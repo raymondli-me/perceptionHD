@@ -296,13 +296,17 @@ class PerceptionHDPipeline:
         self.results = {
             'df': self.df,
             'embeddings': self.embeddings,
+            'pca_features': self.X_pca,
             'X_pca': self.X_pca,
+            'umap_coords': self.X_umap,
             'X_umap': self.X_umap,
             'X_top5': self.X_top5,
             'top_5_indices': self.top_5_indices,
             'contributions_x': self.contributions_x,
             'contributions_y': self.contributions_y,
+            'clusters': self.cluster_labels,
             'cluster_labels': self.cluster_labels,
+            'topics': self.topic_keywords,
             'topic_keywords': self.topic_keywords,
             'dml_results': {
                 'theta_naive': self.theta_naive,
@@ -312,7 +316,11 @@ class PerceptionHDPipeline:
                 'pval_200': self.pval_200,
                 'theta_top5': self.theta_top5,
                 'se_top5': self.se_top5,
-                'pval_top5': self.pval_top5
+                'pval_top5': self.pval_top5,
+                'top_pcs': self.top_5_indices.tolist(),
+                'variance_explained': self.pca.explained_variance_ratio_,
+                'top5_r2': r2_score(self.X_values, cross_val_predict(self.model_x, self.X_top5, self.X_values, cv=5)),
+                'all_r2': r2_score(self.X_values, cross_val_predict(self.model_x, self.X_pca, self.X_values, cv=5))
             },
             'variance_explained': self.pca.explained_variance_ratio_,
             'pc_percentiles': self.pc_percentiles,

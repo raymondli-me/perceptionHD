@@ -6,15 +6,15 @@ analysis:
   top_pcs_count: 5
   umap_dimensions: 3
 display:
-  title: AI Rating vs Social Class Analysis
+  title: X vs Y Analysis
 variables:
   X:
-    max_value: 10
-    min_value: 1
-    name: AI Rating
-    short_name: AI
-  Y:
     max_value: 5
     min_value: 1
-    name: Social Class
-    short_name: SC
+    name: X Variable
+    short_name: X
+  Y:
+    max_value: 10
+    min_value: 1
+    name: Y Variable
+    short_name: Y
