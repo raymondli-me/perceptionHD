@@ -306,6 +306,13 @@ def generate_visualization_v21_exact(results, output_path):
         ("right: 60px;", "right: 250px;"),
     ])
     
+    # Fix z-index issues - make DML and topic stats panels appear above sidebars
+    replacements.extend([
+        ("z-index: 1000;", "z-index: 10000;"),  # DML table
+        ("z-index: 1002;", "z-index: 10002;"),  # Topic stats panel
+        ("z-index: 1001;", "z-index: 10001;"),  # PC stats box if present
+    ])
+    
     # Apply replacements case-insensitively
     for old_text, new_text in replacements:
         # Create a case-insensitive regex pattern
