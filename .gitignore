@@ -50,4 +50,5 @@ test_output/
 quick_demo_output/
 minimal_example_output/
 *.html
+!perceptionhd/templates/*.html
 *.log

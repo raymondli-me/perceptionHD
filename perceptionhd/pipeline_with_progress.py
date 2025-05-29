@@ -595,9 +595,9 @@ class PerceptionHDPipelineWithProgress:
         
         # Generate visualization
         print("\n10. Generating visualization...")
-        from perceptionhd.visualize_v21_fully_generic import generate_visualization_v21_fully_generic
+        from perceptionhd.visualize_from_scratch import generate_visualization_html
         html_path = self.output_dir / "perception_hd_visualization.html"
-        generate_visualization_v21_fully_generic(self.results, html_path)
+        generate_visualization_html(self.results, html_path)
         
         elapsed = time.time() - start_time
         print(f"\n{'='*60}")
