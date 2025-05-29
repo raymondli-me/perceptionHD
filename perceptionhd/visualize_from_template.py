@@ -183,9 +183,9 @@ def generate_visualization_html(results, output_path):
     # Prepare all replacements
     replacements = {
         # Data arrays
-        '{{VIZ_DATA_JSON}}': json.dumps(viz_data, indent=2),
-        '{{TOPIC_VIZ_JSON}}': json.dumps(topic_viz_data, indent=2),
-        '{{TOPIC_STATS_JSON}}': json.dumps(topic_stats_data, indent=2),
+        '{{VIZ_DATA}}': json.dumps(viz_data, indent=2),
+        '{{TOPIC_VIZ_DATA}}': json.dumps(topic_viz_data, indent=2),
+        '{{TOPIC_STATS_DATA}}': json.dumps(topic_stats_data, indent=2),
         
         # Center point
         '{{CENTER_X}}': f'{center_x:.6f}',
