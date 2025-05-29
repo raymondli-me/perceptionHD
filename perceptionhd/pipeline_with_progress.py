@@ -595,7 +595,7 @@ class PerceptionHDPipelineWithProgress:
         
         # Generate visualization
         print("\n10. Generating visualization...")
-        from perceptionhd.visualize_from_scratch import generate_visualization_html
+        from perceptionhd.visualize_from_template import generate_visualization_html
         html_path = self.output_dir / "perception_hd_visualization.html"
         generate_visualization_html(self.results, html_path)
         
