@@ -63,9 +63,19 @@ def generate_visualization_html(results, output_path):
     
     # Calculate percentile thresholds
     ai_p10 = ai_ratings_clean.quantile(0.10)
+    ai_p25 = ai_ratings_clean.quantile(0.25)
+    ai_p75 = ai_ratings_clean.quantile(0.75)
     ai_p90 = ai_ratings_clean.quantile(0.90)
     sc_p10 = essays_df['sc11'].quantile(0.10)
     sc_p90 = essays_df['sc11'].quantile(0.90)
+    
+    # Create percentiles object for JavaScript
+    ai_percentiles = {
+        '10': ai_p10,
+        '25': ai_p25,
+        '75': ai_p75,
+        '90': ai_p90
+    }
     
     # Calculate center of point cloud
     center_x = X_umap_3d[:, 0].mean()
@@ -187,10 +197,10 @@ def generate_visualization_html(results, output_path):
         '{{TOPIC_VIZ_DATA}}': json.dumps(topic_viz_data, indent=2),
         '{{TOPIC_STATS_DATA}}': json.dumps(topic_stats_data, indent=2),
         
-        # Center point
-        '{{CENTER_X}}': f'{center_x:.6f}',
-        '{{CENTER_Y}}': f'{center_y:.6f}',
-        '{{CENTER_Z}}': f'{center_z:.6f}',
+        # Center point (multiply by 100 to match coordinate scaling in template)
+        '{{CENTER_X}}': f'{center_x * 100:.6f}',
+        '{{CENTER_Y}}': f'{center_y * 100:.6f}',
+        '{{CENTER_Z}}': f'{center_z * 100:.6f}',
         
         # Basic stats
         '{{N_ESSAYS}}': str(len(essays_df)),
@@ -205,41 +215,66 @@ def generate_visualization_html(results, output_path):
         '{{AI_THRESHOLD_HIGH}}': f'{ai_p90:.2f}',
         '{{SC_THRESHOLD_LOW}}': str(int(sc_p10)),
         '{{SC_THRESHOLD_HIGH}}': str(int(sc_p90)),
+        '{{SC_LOW}}': str(x_min),  # For SC, use min/max values
+        '{{SC_HIGH}}': str(x_max),
+        
+        # Percentiles
+        '{{AI_PERCENTILES}}': json.dumps(ai_percentiles),
+        '{{AI_PERCENTILE_10}}': f'{ai_p10:.2f}',
+        '{{AI_PERCENTILE_90}}': f'{ai_p90:.2f}',
         
         # Selected PCs
         '{{SELECTED_PCS}}': ', '.join([f'PC{pc}' for pc in dml_results['top_pcs']]),
+        '{{TOP_5_PC_STRING}}': ', '.join([f'PC{pc}' for pc in dml_results['top_pcs']]),
+        
+        # Additional thresholds
+        '{{AI_TOP10_THRESHOLD}}': f'{ai_p90:.2f}',
+        '{{AI_BOTTOM10_THRESHOLD}}': f'{ai_p10:.2f}',
+        '{{AI_LOW}}': f'{ai_p10:.2f}',
+        '{{AI_HIGH}}': f'{ai_p90:.2f}',
+        
+        # PC effects and variance
+        '{{PC_GLOBAL_EFFECTS}}': json.dumps({}),  # Empty for now
+        '{{VARIANCE_EXPLAINED}}': json.dumps(variance_explained.tolist() if hasattr(variance_explained, 'tolist') else variance_explained),
         
         # DML results - Naive model
-        '{{NAIVE_THETA}}': f"{dml_results.get('theta_naive', 0):.3f}",
-        '{{NAIVE_SE}}': f"{dml_results.get('se_naive', 0):.3f}",
-        '{{NAIVE_CI_LOWER}}': f"{dml_results.get('theta_naive', 0) - 1.96 * dml_results.get('se_naive', 0):.3f}",
-        '{{NAIVE_CI_UPPER}}': f"{dml_results.get('theta_naive', 0) + 1.96 * dml_results.get('se_naive', 0):.3f}",
-        '{{NAIVE_PVAL}}': f"{dml_results.get('pval_naive', 0):.4f}",
-        '{{NAIVE_R2}}': f"{dml_results.get('r2_naive', 0):.3f}",
+        '{{THETA_NAIVE}}': f"{dml_results.get('theta_naive', 0):.3f}",
+        '{{SE_NAIVE}}': f"{dml_results.get('se_naive', 0):.3f}",
+        '{{CI_NAIVE}}': f"({dml_results.get('theta_naive', 0) - 1.96 * dml_results.get('se_naive', 0):.3f}, {dml_results.get('theta_naive', 0) + 1.96 * dml_results.get('se_naive', 0):.3f})",
+        '{{PVAL_NAIVE}}': f"{dml_results.get('pval_naive', 0):.4f}",
+        '{{R2_NAIVE}}': f"{dml_results.get('r2_naive', 0):.3f}",
         
         # DML results - 200 PC model
         '{{THETA_200}}': f"{dml_results.get('theta_200', 0):.3f}",
+        '{{THETA_200_CF}}': f"{dml_results.get('theta_200', 0):.3f}",  # Same value for now
         '{{SE_200}}': f"{dml_results.get('se_200', 0):.3f}",
-        '{{CI_200_LOWER}}': f"{dml_results.get('theta_200', 0) - 1.96 * dml_results.get('se_200', 0):.3f}",
-        '{{CI_200_UPPER}}': f"{dml_results.get('theta_200', 0) + 1.96 * dml_results.get('se_200', 0):.3f}",
+        '{{SE_200_CF}}': f"{dml_results.get('se_200', 0):.3f}",
+        '{{CI_200}}': f"({dml_results.get('theta_200', 0) - 1.96 * dml_results.get('se_200', 0):.3f}, {dml_results.get('theta_200', 0) + 1.96 * dml_results.get('se_200', 0):.3f})",
+        '{{CI_200_CF}}': f"({dml_results.get('theta_200', 0) - 1.96 * dml_results.get('se_200', 0):.3f}, {dml_results.get('theta_200', 0) + 1.96 * dml_results.get('se_200', 0):.3f})",
         '{{PVAL_200}}': f"{dml_results.get('pval_200', 0):.4f}",
+        '{{PVAL_200_CF}}': f"{dml_results.get('pval_200', 0):.4f}",
         '{{REDUCTION_200}}': f"{(1 - abs(dml_results.get('theta_200', 0) / max(dml_results.get('theta_naive', 1), 0.001))) * 100:.1f}",
-        '{{ALL_R2_Y}}': f"{dml_results.get('all_r2_y', 0):.3f}",
-        '{{ALL_R2_Y_CV}}': f"{dml_results.get('all_r2_y_cv', 0):.3f}",
-        '{{ALL_R2_X}}': f"{dml_results.get('all_r2_x', 0):.3f}",
-        '{{ALL_R2_X_CV}}': f"{dml_results.get('all_r2_x_cv', 0):.3f}",
+        '{{REDUCTION_200_CF}}': f"{(1 - abs(dml_results.get('theta_200', 0) / max(dml_results.get('theta_naive', 1), 0.001))) * 100:.1f}",
+        '{{R2_AI_200}}': f"{dml_results.get('all_r2_y', 0):.3f}",
+        '{{R2_AI_200_CF}}': f"{dml_results.get('all_r2_y_cv', 0):.3f}",
+        '{{R2_SC_200}}': f"{dml_results.get('all_r2_x', 0):.3f}",
+        '{{R2_SC_200_CF}}': f"{dml_results.get('all_r2_x_cv', 0):.3f}",
         
         # DML results - Top 5 PC model
         '{{THETA_TOP5}}': f"{dml_results.get('theta_top5', 0):.3f}",
+        '{{THETA_TOP5_CF}}': f"{dml_results.get('theta_top5', 0):.3f}",
         '{{SE_TOP5}}': f"{dml_results.get('se_top5', 0):.3f}",
-        '{{CI_TOP5_LOWER}}': f"{dml_results.get('theta_top5', 0) - 1.96 * dml_results.get('se_top5', 0):.3f}",
-        '{{CI_TOP5_UPPER}}': f"{dml_results.get('theta_top5', 0) + 1.96 * dml_results.get('se_top5', 0):.3f}",
+        '{{SE_TOP5_CF}}': f"{dml_results.get('se_top5', 0):.3f}",
+        '{{CI_TOP5}}': f"({dml_results.get('theta_top5', 0) - 1.96 * dml_results.get('se_top5', 0):.3f}, {dml_results.get('theta_top5', 0) + 1.96 * dml_results.get('se_top5', 0):.3f})",
+        '{{CI_TOP5_CF}}': f"({dml_results.get('theta_top5', 0) - 1.96 * dml_results.get('se_top5', 0):.3f}, {dml_results.get('theta_top5', 0) + 1.96 * dml_results.get('se_top5', 0):.3f})",
         '{{PVAL_TOP5}}': f"{dml_results.get('pval_top5', 0):.4f}",
+        '{{PVAL_TOP5_CF}}': f"{dml_results.get('pval_top5', 0):.4f}",
         '{{REDUCTION_TOP5}}': f"{(1 - abs(dml_results.get('theta_top5', 0) / max(dml_results.get('theta_naive', 1), 0.001))) * 100:.1f}",
-        '{{TOP5_R2_Y}}': f"{dml_results.get('top5_r2_y', 0):.3f}",
-        '{{TOP5_R2_Y_CV}}': f"{dml_results.get('top5_r2_y_cv', 0):.3f}",
-        '{{TOP5_R2_X}}': f"{dml_results.get('top5_r2_x', 0):.3f}",
-        '{{TOP5_R2_X_CV}}': f"{dml_results.get('top5_r2_x_cv', 0):.3f}",
+        '{{REDUCTION_TOP5_CF}}': f"{(1 - abs(dml_results.get('theta_top5', 0) / max(dml_results.get('theta_naive', 1), 0.001))) * 100:.1f}",
+        '{{R2_AI_TOP5}}': f"{dml_results.get('top5_r2_y', 0):.3f}",
+        '{{R2_AI_TOP5_CF}}': f"{dml_results.get('top5_r2_y_cv', 0):.3f}",
+        '{{R2_SC_TOP5}}': f"{dml_results.get('top5_r2_x', 0):.3f}",
+        '{{R2_SC_TOP5_CF}}': f"{dml_results.get('top5_r2_x_cv', 0):.3f}",
     }
     
     # Add full embeddings model if available
@@ -311,10 +346,10 @@ def generate_visualization_html(results, output_path):
         ("{{X_SHORT}}", X_short),
         ("{{Y_SHORT}}", Y_short),
         
-        # In JavaScript and CSS
-        ("ai_rating", "y_value"),
-        ("social_class", "x_value"),
-        ("sc11", "x_value"),
+        # Don't replace these in the data! Only in display text
+        # ("ai_rating", "y_value"),  # COMMENTED OUT - breaks data
+        # ("social_class", "x_value"),  # COMMENTED OUT - breaks data
+        # ("sc11", "x_value"),  # COMMENTED OUT - breaks data
         
         # Button text
         (">AI<", f">{Y_short}<"),
